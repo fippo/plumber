@@ -74,26 +74,28 @@ webrtcUI.receiveMessage = function(msg) {
         // also is called between createOffer and callback which is before ice gathering
         // (the dangerous part) starts
 
+        // per-origin permissions
+        var origin = request.documentURI.split('/').splice(0, 3).join('/');
         // I assume that windowID can stay the same while documentURI can change
         // FIXME: when can we clean up windows[uri]?
-        if (!windows[request.documentURI]) {
-            windows[request.documentURI] = {
+        if (!windows[origin]) {
+            windows[origin] = {
                 hasPermission: false,
                 pending: []
             }
-            // add a checkbox
+            // ui trigger
             panel.port.emit(msg.name, {
-                uri: request.documentURI
+                uri: origin
             });
         }
-        if (windows[request.documentURI].hasPermission) {
+        if (windows[origin].hasPermission) {
             // permission already granted
             msg.target.messageManager.sendAsyncMessage('rtcpeer:Allow', { callID: request.callID, windowID: request.windowID });
         } else {
             panel.show({
               position: button
             });
-            windows[request.documentURI].pending.push({
+            windows[origin].pending.push({
                 callID: request.callID,
                 windowID: request.windowID,
                 messageManager: msg.target.messageManager
@@ -101,7 +103,9 @@ webrtcUI.receiveMessage = function(msg) {
         }
         break;
     case 'rtcpeer:CancelRequest':
-        // not clear when that happens, probably needs to clean up
+        // happens when navigating away (soon also on closing the pc)
+        // FIXME: search all windows for pending calls, potentially remove the button
+        // msg.data contains callid 
         console.log('request', msg.data);
         break;
     default:
@@ -144,8 +148,5 @@ panel.port.on('rtcpeer:Deny', function (response) {
         win.pending = [];
     }
 });
-
-// TODO: deny with :Deny (via jib)
-
 
 exports.verhueterli = button;
