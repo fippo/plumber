@@ -30,6 +30,8 @@ document.getElementById('checkbox-iceservers').onclick = function () {
 
 self.port.on('rtcpeer:Request', function(request) {
     var sites = document.getElementById('allowed-sites');
+
+    /*
     var container = document.createElement('div');
     var label = document.createElement('label');
     label.appendChild(document.createTextNode('Allow ' + request.uri));
@@ -46,4 +48,28 @@ self.port.on('rtcpeer:Request', function(request) {
         // since we can't revoke...
         checkbox.disabled = true;
     };
+    */
+
+    // alternative allow-deny approach
+    var container = document.createElement('div');
+    var label = document.createElement('label');
+    label.appendChild(document.createTextNode('Allow ' + request.uri));
+
+    var allow = document.createElement('button');
+    allow.appendChild(document.createTextNode('Y'));
+    allow.onclick = function () {
+        self.port.emit('rtcpeer:Allow', { uri: request.uri });
+        sites.removeChild(container); // maybe replace?
+    };
+    var deny = document.createElement('button');
+    deny.appendChild(document.createTextNode('N'));
+    deny.onclick = function () {
+        self.port.emit('rtcpeer:Deny', { uri: request.uri });
+        sites.removeChild(container); // maybe replace?
+    };
+
+    container.appendChild(label);
+    container.appendChild(allow);
+    container.appendChild(deny);
+    sites.appendChild(container);
 });

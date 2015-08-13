@@ -65,8 +65,8 @@ webrtcUI.receiveMessage = function(msg) {
     switch(msg.name) {
     case 'rtcpeer:Request': 
         var request = msg.data;
+        console.log('request', msg.data);
         console.log('callID', request.callID, 'windowID', request.windowID);
-        console.log('request', request);
         /*
          * console.log: webrtc-verhueterli: request {"windowID":8,"innerWindowID":12,"callID":"1","documentURI":"about:blank","secure":false}
          */
@@ -102,11 +102,13 @@ webrtcUI.receiveMessage = function(msg) {
         break;
     case 'rtcpeer:CancelRequest':
         // not clear when that happens, probably needs to clean up
+        console.log('request', msg.data);
         break;
     default:
         return origReceiveMessage.call(this, msg);
     }
 };
+
 panel.port.on('rtcpeer:Allow', function (response) {
     console.log('allow', response.uri);
     var win = windows[response.uri];
@@ -117,6 +119,24 @@ panel.port.on('rtcpeer:Allow', function (response) {
         win.pending.forEach(function (request) {
             console.log('pending', request);
             request.messageManager.sendAsyncMessage('rtcpeer:Allow', {
+                callID: request.callID,
+                windowID: request.windowID
+            });
+        });
+        win.pending = [];
+    }
+});
+
+panel.port.on('rtcpeer:Deny', function (response) {
+    console.log('deny', response.uri);
+    var win = windows[response.uri];
+    console.log(win, windows);
+    if (win) {
+        win.hasPermission = false;
+        var pending = win.pending;
+        win.pending.forEach(function (request) {
+            console.log('pending', request);
+            request.messageManager.sendAsyncMessage('rtcpeer:Deny', {
                 callID: request.callID,
                 windowID: request.windowID
             });
