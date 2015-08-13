@@ -75,7 +75,8 @@ webrtcUI.receiveMessage = function(msg) {
         // (the dangerous part) starts
 
         // per-origin permissions
-        var origin = request.documentURI.split('/').splice(0, 3).join('/');
+        var origin = msg.target.contentPrincipal.origin;
+
         // I assume that windowID can stay the same while documentURI can change
         // FIXME: when can we clean up windows[uri]?
         if (!windows[origin]) {
