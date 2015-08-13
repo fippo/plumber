@@ -53,18 +53,26 @@ panel.port.on('check-iceservers', function (settings) {
 
 });
 
-// http://mxr.mozilla.org/mozilla-central/source/browser/modules/webrtcUI.jsm?mark=132-155#129
-// biggest issue: how to import this...
+var windows = {};
+function initWindow() {
+    return {
+        hasPCPermission: false,
+        hasGUMPermission: false,
+        pending: []
+    };
+}
 let {webrtcUI} = Cu.import('resource:///modules/webrtcUI.jsm', {});
 console.log('imported', webrtcUI);
 var origReceiveMessage = webrtcUI.receiveMessage;
 console.log('receiveMessage', origReceiveMessage);
-var windows = {};
 webrtcUI.receiveMessage = function(msg) {
     console.log('webrtc receiveMessage', msg.name);
+    var origin;
+    var request;
     switch(msg.name) {
     case 'rtcpeer:Request': 
-        var request = msg.data;
+        origin = msg.target.contentPrincipal.origin;
+        request = msg.data;
         console.log('request', msg.data);
         console.log('callID', request.callID, 'windowID', request.windowID);
         /*
@@ -75,24 +83,22 @@ webrtcUI.receiveMessage = function(msg) {
         // (the dangerous part) starts
 
         // per-origin permissions
-        var origin = msg.target.contentPrincipal.origin;
 
         // I assume that windowID can stay the same while documentURI can change
         // FIXME: when can we clean up windows[uri]?
         if (!windows[origin]) {
-            windows[origin] = {
-                hasPermission: false,
-                pending: []
-            }
+            windows[origin] = initWindow();
             // ui trigger
             panel.port.emit(msg.name, {
                 uri: origin
             });
         }
-        if (windows[origin].hasPermission) {
+        if (windows[origin].hasGUMPermission || windows[origin].hasPCPermission) {
             // permission already granted
+            // FIXME: just forwar to origReceiveMessage?
             msg.target.messageManager.sendAsyncMessage('rtcpeer:Allow', { callID: request.callID, windowID: request.windowID });
         } else {
+            // FIXME UX: too annoying?
             panel.show({
               position: button
             });
@@ -109,6 +115,19 @@ webrtcUI.receiveMessage = function(msg) {
         // msg.data contains callid 
         console.log('request', msg.data);
         break;
+    case 'webrtc:UpdateBrowserIndicators':
+        // when browser indicators are updated this implies that GUM permission has 
+        // been granted (which is easier than hooking webrtc:Allow or Deny by fiddling 
+        // with the mm)
+        origin = msg.target.contentPrincipal.origin;
+        request = msg.data;
+
+        if (!windows[origin]) {
+            windows[origin] = initWindow();
+        };
+        windows[origin].hasGUMPermission = request.camera || request.microphone;
+
+        return origReceiveMessage.call(this, msg);
     default:
         return origReceiveMessage.call(this, msg);
     }
@@ -119,7 +138,7 @@ panel.port.on('rtcpeer:Allow', function (response) {
     var win = windows[response.uri];
     console.log(win, windows);
     if (win) {
-        win.hasPermission = true;
+        win.hasPCPermission = true;
         var pending = win.pending;
         win.pending.forEach(function (request) {
             console.log('pending', request);
@@ -130,14 +149,18 @@ panel.port.on('rtcpeer:Allow', function (response) {
         });
         win.pending = [];
     }
+    panel.hide(); // FIXME: not always?
 });
 
 panel.port.on('rtcpeer:Deny', function (response) {
     console.log('deny', response.uri);
+    // should this also revoke GUM?
     var win = windows[response.uri];
     console.log(win, windows);
     if (win) {
-        win.hasPermission = false;
+        win.hasPCPermission = false;
+        // this revokes the GUM grant currently just to be on the safe side
+        win.hasGUMPermission = false;
         var pending = win.pending;
         win.pending.forEach(function (request) {
             console.log('pending', request);
@@ -148,6 +171,7 @@ panel.port.on('rtcpeer:Deny', function (response) {
         });
         win.pending = [];
     }
+    panel.hide(); // FIXME: not always?
 });
 
 exports.verhueterli = button;
