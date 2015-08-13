@@ -1,0 +1,12 @@
+{
+  "title": "WebRTC Verhueterli",
+  "name": "webrtc-verhueterli",
+  "version": "0.0.1",
+  "description": "turn webrtc on and off",
+  "main": "index.js",
+  "author": "fippo",
+  "engines": {
+    "firefox": ">=38.0a1"
+  },
+  "license": "MPL 2.0"
+}
