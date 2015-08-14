@@ -1,15 +1,14 @@
 let { Cu } = require('chrome');
+let { webrtcUI } = Cu.import('resource:///modules/webrtcUI.jsm', {});
 
-var windows = {};
-function initWindow() {
+var origins = {};
+function initOrigin() {
     return {
         hasPCPermission: false,
         hasGUMPermission: false,
         pending: []
     };
 }
-
-let { webrtcUI } = Cu.import('resource:///modules/webrtcUI.jsm', {});
 
 function notifyPending(pending, message) {
     pending.forEach(function (request) {
@@ -24,24 +23,22 @@ function notifyPending(pending, message) {
 // http://hg.mozilla.org/mozilla-central/file/beb9cc29efb9/browser/modules/webrtcUI.jsm#l170
 var origReceiveMessage = webrtcUI.receiveMessage;
 webrtcUI.receiveMessage = function(msg) {
-    console.log('webrtc receiveMessage', msg.name);
     var origin;
     var request;
     switch(msg.name) {
     case 'rtcpeer:Request': 
         origin = msg.target.contentPrincipal.origin;
         request = msg.data;
-        console.log('request', msg.data);
-        console.log('callID', request.callID, 'windowID', request.windowID);
-        // per-origin permissions
-        if (!windows[origin]) {
-            windows[origin] = initWindow();
+        // permissions are per-origin
+        if (!origins[origin]) {
+            origins[origin] = initOrigin();
         }
-        if (windows[origin].hasGUMPermission || windows[origin].hasPCPermission) {
-            // permission already granted
+        if (origins[origin].hasGUMPermission || origins[origin].hasPCPermission) {
+            // Permission has already been granted.
+            // Assumes GUM permission implies network permission.
             return origReceiveMessage.call(this, msg);
         } else {
-            windows[origin].pending.push({
+            origins[origin].pending.push({
                 callID: request.callID,
                 windowID: request.windowID,
                 messageManager: msg.target.messageManager
@@ -55,9 +52,9 @@ webrtcUI.receiveMessage = function(msg) {
                     label: 'Allow',
                     accessKey: 'a',
                     callback: function() {
-                        windows[origin].hasPCPermission = true;
-                        notifyPending(windows[origin].pending, 'rtcpeer:Allow');
-                        windows[origin].pending = [];
+                        origins[origin].hasPCPermission = true;
+                        notifyPending(origins[origin].pending, 'rtcpeer:Allow');
+                        origins[origin].pending = [];
                     }
                 },
                 [
@@ -65,21 +62,21 @@ webrtcUI.receiveMessage = function(msg) {
                         label: 'Deny',
                         accessKey: 'd',
                         callback: function() {
-                            windows[origin].hasPCPermission = false;
+                            origins[origin].hasPCPermission = false;
                             // this revokes the GUM grant currently just to be on the safe side
-                            windows[origin].hasGUMPermission = false;
+                            origins[origin].hasGUMPermission = false;
 
-                            notifyPending(windows[origin].pending, 'rtcpeer:Deny');
-                            windows[origin].pending = [];
+                            notifyPending(origins[origin].pending, 'rtcpeer:Deny');
+                            origins[origin].pending = [];
                         }
                     },
                     {
                         label: 'Always allow',
                         accessKey: 'A',
                         callback: function() {
-                            windows[origin].hasPCPermission = true;
-                            notifyPending(windows[origin].pending, 'rtcpeer:Allow');
-                            windows[origin].pending = [];
+                            origins[origin].hasPCPermission = true;
+                            notifyPending(origins[origin].pending, 'rtcpeer:Allow');
+                            origins[origin].pending = [];
                             // FIXME: persist
                         }
                     },
@@ -87,12 +84,11 @@ webrtcUI.receiveMessage = function(msg) {
                         label: 'Always deny when no camera permission is asked',
                         accessKey: 'w',
                         callback: function() {
-                            console.log('no');
-                            windows[origin].hasPCPermission = false;
+                            origins[origin].hasPCPermission = false;
                             // this revokes the GUM grant currently just to be on the safe side
-                            windows[origin].hasGUMPermission = false;
-                            notifyPending(windows[origin].pending, 'rtcpeer:Deny');
-                            windows[origin].pending = [];
+                            origins[origin].hasGUMPermission = false;
+                            notifyPending(origins[origin].pending, 'rtcpeer:Deny');
+                            origins[origin].pending = [];
                             // FIXME: persist
                             // FIXME: actually implement this which is currently the default behaviour
                         }
@@ -101,12 +97,11 @@ webrtcUI.receiveMessage = function(msg) {
                         label: 'Always deny',
                         accessKey: 'D',
                         callback: function() {
-                            console.log('no');
-                            windows[origin].hasPCPermission = false;
+                            origins[origin].hasPCPermission = false;
                             // this revokes the GUM grant currently just to be on the safe side
-                            windows[origin].hasGUMPermission = false;
-                            notifyPending(windows[origin].pending, 'rtcpeer:Deny');
-                            windows[origin].pending = [];
+                            origins[origin].hasGUMPermission = false;
+                            notifyPending(origins[origin].pending, 'rtcpeer:Deny');
+                            origins[origin].pending = [];
                             // FIXME: persist
                         }
                     }
@@ -117,7 +112,7 @@ webrtcUI.receiveMessage = function(msg) {
     case 'rtcpeer:CancelRequest':
         // happens when navigating away (soon also on closing the pc)
         // msg.data contains callid which is unique
-        Object.keys(windows).forEach(function (origin) {
+        Object.keys(origins).forEach(function (origin) {
             if (origin.pending && origin.pending.indexOf(msg.data) !== -1) {
                 origin.pending.splice(origin.pending.indexOf(msg.data, 1)); 
             }
@@ -130,10 +125,10 @@ webrtcUI.receiveMessage = function(msg) {
         origin = msg.target.contentPrincipal.origin;
         request = msg.data;
 
-        if (!windows[origin]) {
-            windows[origin] = initWindow();
+        if (!origins[origin]) {
+            origins[origin] = initOrigin();
         }
-        windows[origin].hasGUMPermission = request.camera || request.microphone;
+        origins[origin].hasGUMPermission = request.camera || request.microphone;
         return origReceiveMessage.call(this, msg);
     default:
         return origReceiveMessage.call(this, msg);
