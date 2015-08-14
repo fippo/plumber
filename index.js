@@ -8,7 +8,20 @@ function initWindow() {
         pending: []
     };
 }
-let {webrtcUI} = Cu.import('resource:///modules/webrtcUI.jsm', {});
+
+let { webrtcUI } = Cu.import('resource:///modules/webrtcUI.jsm', {});
+
+function notifyPending(pending, message) {
+    pending.forEach(function (request) {
+        request.messageManager.sendAsyncMessage(message, {
+            callID: request.callID,
+            windowID: request.windowID
+        });
+    });
+}
+
+// overriding receiveMessage here as indicated in
+// http://hg.mozilla.org/mozilla-central/file/beb9cc29efb9/browser/modules/webrtcUI.jsm#l170
 var origReceiveMessage = webrtcUI.receiveMessage;
 webrtcUI.receiveMessage = function(msg) {
     console.log('webrtc receiveMessage', msg.name);
@@ -43,13 +56,7 @@ webrtcUI.receiveMessage = function(msg) {
                     accessKey: 'a',
                     callback: function() {
                         windows[origin].hasPCPermission = true;
-                        windows[origin].pending.forEach(function (request) {
-                            console.log('pending', request);
-                            request.messageManager.sendAsyncMessage('rtcpeer:Allow', {
-                                callID: request.callID,
-                                windowID: request.windowID
-                            });
-                        });
+                        notifyPending(windows[origin].pending, 'rtcpeer:Allow');
                         windows[origin].pending = [];
                     }
                 },
@@ -58,17 +65,11 @@ webrtcUI.receiveMessage = function(msg) {
                         label: 'Deny',
                         accessKey: 'd',
                         callback: function() {
-                            console.log('no');
                             windows[origin].hasPCPermission = false;
                             // this revokes the GUM grant currently just to be on the safe side
                             windows[origin].hasGUMPermission = false;
-                            windows[origin].pending.forEach(function (request) {
-                                console.log('pending', request);
-                                request.messageManager.sendAsyncMessage('rtcpeer:Deny', {
-                                    callID: request.callID,
-                                    windowID: request.windowID
-                                });
-                            });
+
+                            notifyPending(windows[origin].pending, 'rtcpeer:Deny');
                             windows[origin].pending = [];
                         }
                     },
@@ -76,15 +77,8 @@ webrtcUI.receiveMessage = function(msg) {
                         label: 'Always allow',
                         accessKey: 'A',
                         callback: function() {
-                            // FIXME: copy-paste currently
                             windows[origin].hasPCPermission = true;
-                            windows[origin].pending.forEach(function (request) {
-                                console.log('pending', request);
-                                request.messageManager.sendAsyncMessage('rtcpeer:Allow', {
-                                    callID: request.callID,
-                                    windowID: request.windowID
-                                });
-                            });
+                            notifyPending(windows[origin].pending, 'rtcpeer:Allow');
                             windows[origin].pending = [];
                             // FIXME: persist
                         }
@@ -97,14 +91,10 @@ webrtcUI.receiveMessage = function(msg) {
                             windows[origin].hasPCPermission = false;
                             // this revokes the GUM grant currently just to be on the safe side
                             windows[origin].hasGUMPermission = false;
-                            windows[origin].pending.forEach(function (request) {
-                                console.log('pending', request);
-                                request.messageManager.sendAsyncMessage('rtcpeer:Deny', {
-                                    callID: request.callID,
-                                    windowID: request.windowID
-                                });
-                            });
+                            notifyPending(windows[origin].pending, 'rtcpeer:Deny');
                             windows[origin].pending = [];
+                            // FIXME: persist
+                            // FIXME: actually implement this which is currently the default behaviour
                         }
                     },
                     {
@@ -115,13 +105,7 @@ webrtcUI.receiveMessage = function(msg) {
                             windows[origin].hasPCPermission = false;
                             // this revokes the GUM grant currently just to be on the safe side
                             windows[origin].hasGUMPermission = false;
-                            windows[origin].pending.forEach(function (request) {
-                                console.log('pending', request);
-                                request.messageManager.sendAsyncMessage('rtcpeer:Deny', {
-                                    callID: request.callID,
-                                    windowID: request.windowID
-                                });
-                            });
+                            notifyPending(windows[origin].pending, 'rtcpeer:Deny');
                             windows[origin].pending = [];
                             // FIXME: persist
                         }
