@@ -1,12 +1,12 @@
 {
-  "title": "WebRTC Verhueterli",
-  "name": "webrtc-verhueterli",
+  "title": "WebRTC Plumber",
+  "name": "webrtc-plumber",
   "version": "0.0.1",
-  "description": "turn webrtc on and off",
+  "description": "add a doorhanger for webrtc datachannel usage",
   "main": "index.js",
   "author": "fippo",
   "engines": {
-    "firefox": ">=38.0a1"
+    "firefox": ">=43.0a1"
   },
   "license": "MPL 2.0"
 }
