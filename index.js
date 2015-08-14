@@ -116,9 +116,12 @@ webrtcUI.receiveMessage = function(msg) {
         break;
     case 'rtcpeer:CancelRequest':
         // happens when navigating away (soon also on closing the pc)
-        // FIXME: search all windows for pending calls, potentially remove the button
-        // msg.data contains callid 
-        console.log('request', msg.data);
+        // msg.data contains callid which is unique
+        Object.keys(windows).forEach(function (origin) {
+            if (origin.pending && origin.pending.indexOf(msg.data) !== -1) {
+                origin.pending.splice(origin.pending.indexOf(msg.data, 1)); 
+            }
+        });
         break;
     case 'webrtc:UpdateBrowserIndicators':
         // when browser indicators are updated this implies that GUM permission has 
