@@ -54,9 +54,11 @@ var origReceiveMessage = webrtcUI.receiveMessage;
 webrtcUI.receiveMessage = function(msg) {
     var origin;
     var request;
+    var secure = false;
     switch(msg.name) {
     case 'rtcpeer:Request': 
         origin = msg.target.contentPrincipal.origin;
+        secure = origin.indexOf('https:') === 0;
         request = msg.data;
         // permissions are per-origin
         if (!origins[origin]) {
@@ -79,10 +81,7 @@ webrtcUI.receiveMessage = function(msg) {
 
             // show doorhanger -- FIXME: only once?
             var browserWindow = msg.target.ownerDocument.defaultView;
-            browserWindow.PopupNotifications.show(msg.target,
-                'webrtc-datachannel',
-                'Allow WebRTC P2P networking for ' + origin,
-                null,
+            var questions = [
                 {
                     label: 'Allow',
                     accessKey: 'a',
@@ -92,17 +91,19 @@ webrtcUI.receiveMessage = function(msg) {
                         origins[origin].pending = [];
                     }
                 },
-                [
-                    {
-                        label: 'Deny',
-                        accessKey: 'd',
-                        callback: function() {
-                            // resetting so we don't get further requests
-                            origins[origin].hasPersistentPCPermission = false;
-                            notifyPending(origins[origin].pending, 'rtcpeer:Deny', request.innerWindowID);
-                            origins[origin].pending = [];
-                        }
-                    },
+                {
+                    label: 'Deny',
+                    accessKey: 'd',
+                    callback: function() {
+                        // resetting so we don't get further requests
+                        origins[origin].hasPersistentPCPermission = false;
+                        notifyPending(origins[origin].pending, 'rtcpeer:Deny', request.innerWindowID);
+                        origins[origin].pending = [];
+                    }
+                }
+            ]
+            if (secure) {
+                questions.push(
                     {
                         label: 'Always allow',
                         accessKey: 'l',
@@ -126,7 +127,14 @@ webrtcUI.receiveMessage = function(msg) {
                             saveOriginPermissions();
                         }
                     }
-                ]
+                );
+            }
+            browserWindow.PopupNotifications.show(msg.target,
+                'webrtc-datachannel',
+                'Allow WebRTC P2P networking for ' + origin,
+                null,
+                questions.shift(),
+                questions
             );
         }
         break;
