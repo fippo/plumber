@@ -1,3 +1,6 @@
+## Dealing with leaks
+![Dealing with leaks](http://24.media.tumblr.com/tumblr_l0fxmicsTs1qztjn5o1_500.gif)
+
 ## building the XPI
 ```
 npm i -g jpm
