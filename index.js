@@ -99,14 +99,59 @@ webrtcUI.receiveMessage = function(msg) {
             msg.target.messageManager.sendAsyncMessage('rtcpeer:Allow', { callID: request.callID, windowID: request.windowID });
         } else {
             // FIXME UX: too annoying?
-            panel.show({
-              position: button
-            });
             windows[origin].pending.push({
                 callID: request.callID,
                 windowID: request.windowID,
                 messageManager: msg.target.messageManager
             });
+            var browserWindow = msg.target.ownerDocument.defaultView;
+            //console.log('BWIN', browserWindow);
+            console.log(msg.target);
+            browserWindow.PopupNotifications.show(msg.target,
+                'webrtc-datachannel',
+                'Allow WebRTC P2P networking',
+                null,
+                {
+                    label: 'Yes',
+                    accessKey: 'y',
+                    callback: function() {
+                        windows[origin].hasPCPermission = true;
+                        windows[origin].pending.forEach(function (request) {
+                            console.log('pending', request);
+                            request.messageManager.sendAsyncMessage('rtcpeer:Allow', {
+                                callID: request.callID,
+                                windowID: request.windowID
+                            });
+                        });
+                        windows[origin].pending = [];
+                    }
+                },
+                [
+                    {
+                        label: 'No',
+                        accessKey: 'n',
+                        callback: function() {
+                            console.log('no');
+                            windows[origin].hasPCPermission = false;
+                            // this revokes the GUM grant currently just to be on the safe side
+                            windows[origin].hasGUMPermission = false;
+                            windows[origin].pending.forEach(function (request) {
+                                console.log('pending', request);
+                                request.messageManager.sendAsyncMessage('rtcpeer:Deny', {
+                                    callID: request.callID,
+                                    windowID: request.windowID
+                                });
+                            });
+                            windows[origin].pending = [];
+                        }
+                    }
+                ]
+            );
+            /*
+            panel.show({
+              position: button
+            });
+            */
         }
         break;
     case 'rtcpeer:CancelRequest':
