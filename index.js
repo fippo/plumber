@@ -1,5 +1,8 @@
 let { Cu } = require('chrome');
 let { webrtcUI } = Cu.import('resource:///modules/webrtcUI.jsm', {});
+var pref = require('sdk/preferences/service');
+var PREFKEY = 'extensions.@webrtc-plumber.settings';
+
 
 var origins = {};
 function initOrigin() {
@@ -22,6 +25,29 @@ function notifyPending(pending, message, windowid) {
     });
 }
 
+function saveOriginPermissions() {
+    var value = {};
+    Object.keys(origins).forEach(function (origin) {
+        console.log('yay?', origins[origin].hasPersistentPCPermission !== null);
+        if (origins[origin].hasPersistentPCPermission !== null) {
+            value[origin] = origins[origin].hasPersistentPCPermission;
+        }
+    });
+    pref.set(PREFKEY, JSON.stringify(value));
+}
+function loadOriginPermissions() {
+    var value = pref.get(PREFKEY);
+    try {
+        value = JSON.parse(value);
+        Object.keys(value).forEach(function (origin) {
+            origins[origin] = initOrigin();
+            origins[origin].hasPersistentPCPermission = value[origin];
+        });
+    } catch(e) {
+    }
+}
+loadOriginPermissions();
+
 // overriding receiveMessage here as indicated in
 // http://hg.mozilla.org/mozilla-central/file/beb9cc29efb9/browser/modules/webrtcUI.jsm#l170
 var origReceiveMessage = webrtcUI.receiveMessage;
@@ -36,7 +62,7 @@ webrtcUI.receiveMessage = function(msg) {
         if (!origins[origin]) {
             origins[origin] = initOrigin();
         }
-        if (origins[origin].hasGUMPermission
+        if (origins[origin].hasGUMPermission === true
           || origins[origin].hasPersistentPCPermission === true
           || origins[origin].temporaryPCPermissions.indexOf(request.innerWindowID) !== -1
             ) {
@@ -79,39 +105,25 @@ webrtcUI.receiveMessage = function(msg) {
                     },
                     {
                         label: 'Always allow',
-                        accessKey: 'A',
+                        accessKey: 'l',
                         callback: function() {
                             origins[origin].hasPersistentPCPermission = true;
                             origins[origin].hasTemporaryPCPermission = []; // reset to save memory
                             notifyPending(origins[origin].pending, 'rtcpeer:Allow');
                             origins[origin].pending = [];
-                            // FIXME: persist
-                        }
-                    },
-                    {
-                        label: 'Always deny when no camera permission is asked',
-                        accessKey: 'w',
-                        callback: function() {
-                            // FIXME: actually implement this which is currently the default behaviour
-
-                            origins[origin].hasPersistentPCPermission = false;
-                            // this revokes the GUM grant currently just to be on the safe side
-                            origins[origin].hasGUMPermission = false;
-                            notifyPending(origins[origin].pending, 'rtcpeer:Deny');
-                            origins[origin].pending = [];
-                            // FIXME: persist
+                            saveOriginPermissions();
                         }
                     },
                     {
                         label: 'Always deny',
-                        accessKey: 'D',
+                        accessKey: 'w',
                         callback: function() {
                             origins[origin].hasPersistentPCPermission = false;
                             // this revokes the GUM grant currently just to be on the safe side
                             origins[origin].hasGUMPermission = false;
                             notifyPending(origins[origin].pending, 'rtcpeer:Deny');
                             origins[origin].pending = [];
-                            // FIXME: persist
+                            saveOriginPermissions();
                         }
                     }
                 ]
@@ -143,3 +155,5 @@ webrtcUI.receiveMessage = function(msg) {
         return origReceiveMessage.call(this, msg);
     }
 };
+
+
