@@ -1,6 +1,4 @@
-var self = require('sdk/self');
-var prefs = require('sdk/preferences/service');
-let { Cc, Ci, Cu } = require('chrome');
+let { Cu } = require('chrome');
 
 var windows = {};
 function initWindow() {
@@ -147,7 +145,7 @@ webrtcUI.receiveMessage = function(msg) {
 
         if (!windows[origin]) {
             windows[origin] = initWindow();
-        };
+        }
         windows[origin].hasGUMPermission = request.camera || request.microphone;
         return origReceiveMessage.call(this, msg);
     default:
