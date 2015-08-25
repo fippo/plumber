@@ -131,7 +131,7 @@ webrtcUI.receiveMessage = function(msg) {
             }
             browserWindow.PopupNotifications.show(msg.target,
                 'webrtc-datachannel',
-                'Allow WebRTC P2P networking for ' + origin,
+                'Allow WebRTC peer networking for ' + origin,
                 null,
                 questions.shift(),
                 questions
