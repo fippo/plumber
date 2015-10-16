@@ -71,7 +71,10 @@ webrtcUI.receiveMessage = function(msg) {
             // Permission has already been granted.
             // Assumes GUM permission implies network permission.
             return origReceiveMessage.call(this, msg);
-        } else if (origins[origin].hasPersistentPCPermission !== false) {
+        } else if (origins[origin].hasPersistentPCPermission === false) {
+            // Permission has already been blocked.
+            return msg.target.messageManager.sendAsyncMessage('rtcpeer:Deny', request);
+        } else {
             origins[origin].pending.push({
                 callID: request.callID,
                 windowID: request.windowID,
